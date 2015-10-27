@@ -1,0 +1,58 @@
+#!/usr/bin/expect
+
+set username backup-configs
+set password "somepassword"
+set devicelist "firewall-a firewall-b"
+set backupdir "/config-backups/ASA/"
+set time [exec date \+\%Y\%m\%d]
+set timeout 30
+set reg_prompt "*>"
+set enable_prompt "*#"
+
+log_user 0
+
+
+foreach device $devicelist {
+  spawn ssh -q -o StrictHostKeyChecking=no $username@$device
+  expect {
+    timeout { send_user "\nFailed to get password prompt.\n"; exit 1 }
+    "*assword:"
+  }
+  send "$password\r"
+  expect {
+    timeout { send_user "\nLogin failed. Invalid password.\n"; exit 1 }
+    $reg_prompt
+  }
+  send "login\r"
+  expect {
+    timeout {send_User "\nLogin to enable failed.\n"; exit 1 }
+    "*sername:"
+  }
+  send "$username\r"
+  expect {
+    timeout { send_user "\nLogin to enable failed. Invalid username\n"; exit 1 }
+    "*assword:"
+  }
+  send "$password\r"
+  expect {
+    timeout { send_user "\nLogin to enable failed. Invalid password.\n"; exit 1 }
+    $enable_prompt
+  }
+  send "terminal pager 0\r"
+  expect {
+    timeout { send_user "\nSet terminal pager 0 failed.\n"; exit 1 }
+    $enable_prompt
+  }
+  set filename [append device "-run-config-" $time]
+
+  log_file "$backupdir$filename"
+  log_user 1
+  send "show running-config\n"
+  expect {
+    timeout { send_user "\nShow Running Config failed.\n"; exit 1 }
+    $enable_prompt
+  }
+  log_user 0
+  send "exit\n"
+  log_file
+}

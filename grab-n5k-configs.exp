@@ -1,0 +1,35 @@
+#!/usr/bin/expect
+
+set username backup-configs
+set devicelist "switch-a switch-b"
+set backupdir "/config-backups/N5K/"
+set time [exec date \+\%Y\%m\%d]
+set timeout 30
+
+log_user 0
+
+
+foreach device $devicelist {
+  set prompt [append $device "#"]
+  spawn ssh -q -o StrictHostKeyChecking=no $username@$device
+  expect {
+    timeout { send_user "\nLogin failed.\n"; exit 1 }
+    $prompt
+  }
+  send "terminal length 0\r"
+  expect {
+    timeout { send_user "\nSet terminal length 0 failed.\n"; exit 1 }
+    $prompt
+  }
+  set filename [append device "-run-config-" $time]
+  log_file "$backupdir$filename"
+  log_user 1
+  send "show running-config\n"
+  expect {
+    timeout { send_user "\nShow Running Config failed.\n"; exit 1 }
+    $prompt
+  }
+  log_user 0
+  send "exit\n"
+  log_file
+}
